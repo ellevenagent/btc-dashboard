@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📊 BTC Monitor - Game 72h</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 20px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        
+        h1 { 
+            text-align: center; 
+            margin-bottom: 30px;
+            font-size: 2rem;
+            background: linear-gradient(90deg, #f7931a, #ff6b6b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            margin-left: 10px;
+        }
+        .status-OPEN { background: #10b981; }
+        .status-CLOSED { background: #ef4444; }
+        .status-WAITING { background: #f59e0b; }
+        
+        .card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .price-display {
+            font-size: 3rem;
+            font-weight: bold;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .price-up { color: #10b981; }
+        .price-down { color: #ef4444; }
+        
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .metric {
+            background: rgba(255,255,255,0.05);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .metric-label {
+            font-size: 0.8rem;
+            color: #9ca3af;
+            margin-bottom: 5px;
+        }
+        
+        .metric-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        
+        .pnl-positive { color: #10b981; }
+        .pnl-negative { color: #ef4444; }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        th { color: #9ca3af; font-weight: normal; }
+        
+        .last-updated {
+            text-align: center;
+            color: #6b7280;
+            font-size: 0.9rem;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 BTC Monitor <span id="status" class="status-badge status-WAITING">AGUARDANDO</span></h1>
+        
+        <div class="card">
+            <div class="price-display">
+                <span id="btc-price">$---</span>
+                <span id="price-change" class="price-up">0.00%</span>
+            </div>
+            
+            <div class="metrics-grid">
+                <div class="metric">
+                    <div class="metric-label">Saldo</div>
+                    <div class="metric-value" id="balance">$1,000</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">P&L</div>
+                    <div class="metric-value pnl-positive" id="pnl">+0.00%</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Operações</div>
+                    <div class="metric-value" id="operations">0</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">BTC Preservado</div>
+                    <div class="metric-value" id="btc-preserved">0 BTC</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h3>📋 Operações</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Tipo</th>
+                        <th>Entrada</th>
+                        <th>Saída</th>
+                        <th>P&L</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="operations-table">
+                    <tr>
+                        <td colspan="6" style="text-align: center; color: #6b7280;">
+                            Nenhuma operação ainda
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="last-updated">
+            Última atualização: <span id="last-updated">---</span>
+        </div>
+    </div>
+    
+    <script>
+        // Dados iniciais
+        let gameData = {
+            status: 'WAITING',
+            btcPrice: 0,
+            priceChange24h: 0,
+            balance: 1000,
+            pnl: 0,
+            operations: 0,
+            btcPreserved: 0,
+            positions: []
+        };
+        
+        // Atualizar UI
+        function updateUI() {
+            document.getElementById('btc-price').textContent = '$' + gameData.btcPrice.toLocaleString('en-US', {minimumFractionDigits: 2});
+            
+            const changeEl = document.getElementById('price-change');
+            changeEl.textContent = (gameData.priceChange24h >= 0 ? '+' : '') + gameData.priceChange24h.toFixed(2) + '%';
+            changeEl.className = gameData.priceChange24h >= 0 ? 'price-up' : 'price-down';
+            
+            document.getElementById('balance').textContent = '$' + gameData.balance.toLocaleString('en-US', {minimumFractionDigits: 2});
+            
+            const pnlEl = document.getElementById('pnl');
+            pnlEl.textContent = (gameData.pnl >= 0 ? '+' : '') + gameData.pnl.toFixed(2) + '%';
+            pnlEl.className = 'metric-value ' + (gameData.pnl >= 0 ? 'pnl-positive' : 'pnl-negative');
+            
+            document.getElementById('operations').textContent = gameData.operations;
+            document.getElementById('btc-preserved').textContent = gameData.btcPreserved.toFixed(5) + ' BTC';
+            
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = gameData.status === 'OPEN' ? 'ABERTA' : (gameData.status === 'CLOSED' ? 'ENCERRADA' : 'AGUARDANDO');
+            statusEl.className = 'status-badge status-' + gameData.status;
+            
+            // Atualizar tabela
+            const tbody = document.getElementById('operations-table');
+            if (gameData.positions.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #6b7280;">Nenhuma operação ainda</td></tr>';
+            } else {
+                tbody.innerHTML = gameData.positions.map((pos, i) => '
+                    <tr>
+                        <td>${i + 1}</td>
+                        <td>${pos.type}</td>
+                        <td>$${pos.entry.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                        <td>$${pos.exit ? pos.exit.toLocaleString('en-US', {minimumFractionDigits: 2}) : '-'}</td>
+                        <td class="${pos.pnl >= 0 ? 'pnl-positive' : 'pnl-negative'}">${pos.pnl >= 0 ? '+' : ''}${pos.pnl.toFixed(2)}%</td>
+                        <td>${pos.status}</td>
+                    </tr>
+                ').join('');
+            }
+            
+            document.getElementById('last-updated').textContent = new Date().toLocaleString('pt-BR');
+        }
+        
+        // Buscar dados do servidor
+        async function fetchData() {
+            try {
+                const response = await fetch('/api/game-data');
+                if (response.ok) {
+                    const data = await response.json();
+                    gameData = { ...gameData, ...data };
+                    updateUI();
+                }
+            } catch (e) {
+                console.log('API não disponível, usando dados locais');
+            }
+        }
+        
+        // Inicializar
+        updateUI();
+        setInterval(updateUI, 30000); // Atualizar a cada 30s
+        
+        console.log('📊 BTC Monitor Dashboard carregado');
+    </script>
+</body>
+</html>
